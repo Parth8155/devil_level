@@ -29,6 +29,17 @@ const createMovingPlatformState = (definitions = []) =>
     bounceStrength: platform.bounceStrength,
   }));
 
+const createJumpPadState = (definitions = []) =>
+  definitions.map((pad) => {
+    const startX = pad.startX ?? pad.x ?? pad.minX ?? 0;
+    return {
+      ...pad,
+      startX,
+      x: startX,
+      direction: pad.initialDirection ?? 1,
+    };
+  });
+
 const prepareStaticPlatforms = (level) =>
   (level.platforms ?? []).map((platform) => ({
     ...platform,
@@ -44,16 +55,19 @@ const levels = [
     hint: 'Hit the ground jump pad before the spikes and stay alert for crumbling ledges above!',
     startPosition: { x: 50, y: 50 },
     door: { x: 760, y: 150, width: 30, height: 50 },
-    jumpPad: {
-      startX: 120,
-      minX: 120,
-      maxX: 120,
-      width: 40,
-      height: 20,
-      y: 330,
-      speed: 0,
-      strength: -15,
-    },
+    jumpPads: [
+      {
+        id: 'infernal-launch',
+        startX: 120,
+        minX: 120,
+        maxX: 120,
+        width: 40,
+        height: 20,
+        y: 330,
+        speed: 0,
+        strength: -15,
+      },
+    ],
     platforms: [
       { x: 0, y: 350, width: 170, height: 50, variant: 'ground' },
       {
@@ -95,7 +109,7 @@ const levels = [
     hint: 'Approach the ferry platform, hop on, and ride it across the lava pit.',
     startPosition: { x: 40, y: 240 },
     door: { x: 720, y: 180, width: 30, height: 50 },
-    jumpPad: null,
+    jumpPads: [],
     platforms: [
       { x: 0, y: 350, width: 170, height: 50, variant: 'ground' },
       { x: 640, y: 350, width: 160, height: 50, variant: 'ground' },
@@ -124,7 +138,7 @@ const levels = [
     hint: 'The second ledge splits under your feet - clear the gap before it collapses!',
     startPosition: { x: 30, y: 80 },
     door: { x: 700, y: 90, width: 30, height: 50 },
-    jumpPad: null,
+    jumpPads: [],
     platforms: [
       { x: 0, y: 350, width: 130, height: 50, variant: 'ground' },
       {
@@ -158,7 +172,7 @@ const levels = [
     hint: 'Chain bounce ferry rides, collapsing stones, and a shrinking perch to reach the door.',
     startPosition: { x: 36, y: 240 },
     door: { x: 740, y: 60, width: 30, height: 50 },
-    
+    jumpPads: [],
     platforms: [
       { x: 0, y: 350, width: 110, height: 50, variant: 'ground' },
       { x: 270, y: 230, width: 38, height: 14, variant: 'floating', breakable: { type: 'vanish', autoTriggerRange: 28 } },
@@ -182,6 +196,29 @@ const levels = [
       { x: 648, y: 328, width: 90, height: 22 },
     ],
   },
+  {
+    name: 'Blazing Return',
+    hint: 'Ride each moving launch pad as it glides forward, then spring off before it snaps back.',
+    startPosition: { x: 40, y: 260 },
+    door: { x: 720, y: 160, width: 30, height: 50 },
+    jumpPads: [
+      { id: 'return-pad-1', startX: 200, minX: 160, maxX: 240, width: 40, height: 18, y: 300, speed: 1.6, strength: -10 },
+      { id: 'return-pad-2', startX: 300, minX: 260, maxX: 340, width: 40, height: 18, y: 280, speed: 1.6, strength: -10 },
+      { id: 'return-pad-3', startX: 400, minX: 360, maxX: 440, width: 40, height: 18, y: 260, speed: 1.6, strength: -10 },
+      { id: 'return-pad-4', startX: 500, minX: 460, maxX: 540, width: 40, height: 18, y: 240, speed: 1.6, strength: -10 },
+    ],
+    platforms: [
+      { x: 0, y: 350, width: 150, height: 50, variant: 'ground' },
+      { x: 40, y: 290, width: 90, height: 18, variant: 'floating' },
+      { x: 640, y: 350, width: 160, height: 50, variant: 'ground' },
+      { x: 640, y: 220, width: 160, height: 20, variant: 'floating' },
+    ],
+    movingPlatforms: [],
+    spikes: [
+      { x: 140, y: 328, width: 500, height: 22 },
+    ],
+  },
+
 ];
 
 export default function DevilPlatformer() {
@@ -194,8 +231,7 @@ export default function DevilPlatformer() {
   const velocityRef = useRef({ x: 0, y: 0 });
   const keysRef = useRef({});
   const isJumpingRef = useRef(false);
-  const jumpPadPositionRef = useRef(levels[0].jumpPad ? levels[0].jumpPad.startX : 0);
-  const jumpPadDirectionRef = useRef(1);
+  const jumpPadsRef = useRef(createJumpPadState(levels[0].jumpPads ?? []));
   const deathMessageTimeoutRef = useRef();
   const staticPlatformsRef = useRef(prepareStaticPlatforms(levels[0]));
   const movingPlatformsRef = useRef(createMovingPlatformState(levels[0].movingPlatforms ?? []));
@@ -243,8 +279,7 @@ export default function DevilPlatformer() {
     velocityRef.current = { x: 0, y: 0 };
     isJumpingRef.current = false;
     keysRef.current = {};
-    jumpPadPositionRef.current = level.jumpPad ? level.jumpPad.startX : 0;
-    jumpPadDirectionRef.current = 1;
+  jumpPadsRef.current = createJumpPadState(level.jumpPads ?? []);
     setGameState('playing');
     setShowMessage(false);
     if (deathMessageTimeoutRef.current) {
@@ -312,19 +347,18 @@ export default function DevilPlatformer() {
   };
 
   const checkJumpPadCollision = (x, y) => {
-    if (!level.jumpPad) return false;
-    const pad = level.jumpPad;
-    const padX = jumpPadPositionRef.current;
-    if (
-      x + DEVIL_WIDTH > padX &&
-      x < padX + pad.width &&
-      y + DEVIL_HEIGHT >= pad.y &&
-      y + DEVIL_HEIGHT <= pad.y + pad.height &&
-      velocityRef.current.y >= 0
-    ) {
-      return true;
+    for (let pad of jumpPadsRef.current ?? []) {
+      if (
+        x + DEVIL_WIDTH > pad.x &&
+        x < pad.x + pad.width &&
+        y + DEVIL_HEIGHT >= pad.y &&
+        y + DEVIL_HEIGHT <= pad.y + pad.height &&
+        velocityRef.current.y >= 0
+      ) {
+        return pad;
+      }
     }
-    return false;
+    return null;
   };
 
   const checkDoorCollision = (x, y) => {
@@ -487,13 +521,20 @@ export default function DevilPlatformer() {
         });
       }
 
-      if (level.jumpPad) {
-        const pad = level.jumpPad;
-        jumpPadPositionRef.current += pad.speed * jumpPadDirectionRef.current;
-        if (jumpPadPositionRef.current <= pad.minX || jumpPadPositionRef.current >= pad.maxX) {
-          jumpPadDirectionRef.current *= -1;
-          jumpPadPositionRef.current = Math.max(pad.minX, Math.min(jumpPadPositionRef.current, pad.maxX));
-        }
+      if (jumpPadsRef.current.length) {
+        jumpPadsRef.current.forEach((pad) => {
+          if (!pad.speed || pad.minX === undefined || pad.maxX === undefined) {
+            return;
+          }
+          pad.x += pad.speed * pad.direction;
+          if (pad.x <= pad.minX) {
+            pad.x = pad.minX;
+            pad.direction = 1;
+          } else if (pad.x >= pad.maxX) {
+            pad.x = pad.maxX;
+            pad.direction = -1;
+          }
+        });
       }
 
       let newVelX = 0;
@@ -550,8 +591,9 @@ export default function DevilPlatformer() {
           }
         }
 
-        if (checkJumpPadCollision(newX, newY)) {
-          const padStrength = level.jumpPad?.strength ?? SUPER_JUMP_STRENGTH;
+        const collidedJumpPad = checkJumpPadCollision(newX, newY);
+        if (collidedJumpPad) {
+          const padStrength = collidedJumpPad.strength ?? SUPER_JUMP_STRENGTH;
           velocityRef.current.y = padStrength;
           isJumpingRef.current = true;
         }
@@ -610,8 +652,7 @@ export default function DevilPlatformer() {
     velocityRef.current = { x: 0, y: 0 };
     isJumpingRef.current = false;
     keysRef.current = {};
-    jumpPadPositionRef.current = level.jumpPad ? level.jumpPad.startX : 0;
-    jumpPadDirectionRef.current = 1;
+  jumpPadsRef.current = createJumpPadState(level.jumpPads ?? []);
     setGameState('playing');
     setShowMessage(false);
     if (deathMessageTimeoutRef.current) {
@@ -631,9 +672,10 @@ export default function DevilPlatformer() {
   const previousDisabled = levelIndex === 0;
   const nextDisabled = levelIndex >= maxUnlockedLevel || levelIndex >= levels.length - 1;
   const isLastLevel = levelIndex === levels.length - 1;
-  const instructionsMessage = level.hint ?? (level.jumpPad
-    ? 'Reach the blue door and use the moving jump pad for a super boost!'
-    : 'Reach the blue door with careful jumps - no jump pad to help this time!');
+  const hasJumpPads = (level.jumpPads?.length ?? 0) > 0;
+  const instructionsMessage = level.hint ?? (hasJumpPads
+    ? 'Reach the blue door and use the moving jump pads for a super boost!'
+    : 'Reach the blue door with careful jumps - no jump pads to help this time!');
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-orange-800 to-red-900 p-8">
@@ -717,14 +759,15 @@ export default function DevilPlatformer() {
           </div>
         ))}
 
-        {level.jumpPad && (
+        {jumpPadsRef.current.map((pad, idx) => (
           <div
+            key={`jump-pad-${pad.id ?? idx}`}
             className="absolute"
             style={{
-              left: `${jumpPadPositionRef.current}px`,
-              top: `${level.jumpPad.y}px`,
-              width: `${level.jumpPad.width}px`,
-              height: `${level.jumpPad.height}px`,
+              left: `${pad.x}px`,
+              top: `${pad.y}px`,
+              width: `${pad.width}px`,
+              height: `${pad.height}px`,
             }}
           >
             <div className="w-full h-full bg-yellow-600 border-2 border-yellow-800 relative">
@@ -734,7 +777,7 @@ export default function DevilPlatformer() {
               </div>
             </div>
           </div>
-        )}
+        ))}
 
         {level.door && (
           <div
