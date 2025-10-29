@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 const GRAVITY = 0.6;
 const JUMP_STRENGTH = -10;
 const MOVE_SPEED = 5;
-const CANVAS_WIDTH = 800;
-const CANVAS_HEIGHT = 400;
+const CANVAS_WIDTH = 1000;
+const CANVAS_HEIGHT = 550;
 const DEVIL_BASE_WIDTH = 40;
 const DEVIL_BASE_HEIGHT = 50;
 const DEVIL_WIDTH = 25;
@@ -138,16 +138,14 @@ const levels = [
       { x: 630, y: 350, width: 170, height: 50, variant: 'ground' },
     ],
     spikes: [
-      { x: 170, y: 328, width: 280, height: 22 },
-      { x: 450, y: 328, width: 180, height: 22 },
-    ],
+      { x: 170, y: 335, width: 700, height: 15 }    ],
     movingSpikes: [],
   },
   {
     name: 'Molten Ferry',
     hint: 'Approach the ferry platform, hop on, and ride it across the lava pit.',
     startPosition: { x: 40, y: 240 },
-    door: { x: 720, y: 180, width: 30, height: 50 },
+    door: { x: 690, y: 180, width: 30, height: 50 },
     jumpPads: [],
     platforms: [
       { x: 0, y: 350, width: 170, height: 50, variant: 'ground' },
@@ -157,8 +155,8 @@ const levels = [
     movingPlatforms: [
       {
         id: 'lava-ferry',
-        startX: 220,
-        startY: 260,
+        startX: 210,
+        startY: 275,
         width: 80,
         height: 20,
         travelDistance: 300,
@@ -169,7 +167,7 @@ const levels = [
       },
     ],
     spikes: [
-      { x: 170, y: 328, width: 420, height: 22 },
+      { x: 170, y: 335, width: 565, height: 15 },
     ],
     movingSpikes: [],
   },
@@ -183,7 +181,7 @@ const levels = [
       { x: 0, y: 350, width: 130, height: 50, variant: 'ground' },
       {
         x: 140,
-        y: 260,
+        y: 275,
         width: 120,
         height: 20,
         variant: 'floating',
@@ -199,12 +197,10 @@ const levels = [
       },
       { x: 460, y: 180, width: 140, height: 20, variant: 'floating' },
       { x: 640, y: 140, width: 140, height: 20, variant: 'floating' },
-      { x: 670, y: 350, width: 130, height: 50, variant: 'ground' },
     ],
     spikes: [
-      { x: 130, y: 328, width: 110, height: 22 },
-      { x: 280, y: 328, width: 140, height: 22 },
-      { x: 460, y: 328, width: 160, height: 22 },
+      { x: 130, y: 335, width: 800, height: 15 },
+      
     ],
     movingSpikes: [],
   },
@@ -212,7 +208,7 @@ const levels = [
     name: "Hell's Gauntlet",
     hint: 'Chain bounce ferry rides, collapsing stones, and a shrinking perch to reach the door.',
     startPosition: { x: 36, y: 240 },
-    door: { x: 740, y: 60, width: 30, height: 50 },
+    door: { x: 730, y: 83, width: 30, height: 50 },
     jumpPads: [],
     platforms: [
       { x: 0, y: 350, width: 110, height: 50, variant: 'ground' },
@@ -228,36 +224,7 @@ const levels = [
       { id: 'final-hop', startX: 560, startY: 170, width: 60, height: 12, travelDistance: 150, speed: 4.8, activationRange: 80, carryPlayer: true, bounceStrength: -14 },
     ],
     spikes: [
-      { x: 110, y: 328, width: 50, height: 22 },
-      { x: 168, y: 328, width: 40, height: 22 },
-      { x: 228, y: 328, width: 40, height: 22 },
-      { x: 288, y: 328, width: 48, height: 22 },
-      { x: 348, y: 328, width: 160, height: 22 },
-      { x: 512, y: 328, width: 120, height: 22 },
-      { x: 648, y: 328, width: 90, height: 22 },
-    ],
-    movingSpikes: [],
-  },
-  {
-    name: 'Blazing Return',
-    hint: 'Ride each moving launch pad as it glides forward, then spring off before it snaps back.',
-    startPosition: { x: 40, y: 260 },
-    door: { x: 720, y: 160, width: 30, height: 50 },
-    jumpPads: [
-      { id: 'return-pad-1', startX: 200, minX: 160, maxX: 240, width: 40, height: 18, y: 300, speed: 1.6, strength: -10 },
-      { id: 'return-pad-2', startX: 300, minX: 260, maxX: 340, width: 40, height: 18, y: 280, speed: 1.6, strength: -10 },
-      { id: 'return-pad-3', startX: 400, minX: 360, maxX: 440, width: 40, height: 18, y: 260, speed: 1.6, strength: -10 },
-      { id: 'return-pad-4', startX: 500, minX: 460, maxX: 540, width: 40, height: 18, y: 240, speed: 1.6, strength: -10 },
-    ],
-    platforms: [
-      { x: 0, y: 350, width: 150, height: 50, variant: 'ground' },
-      { x: 40, y: 290, width: 90, height: 18, variant: 'floating' },
-      { x: 640, y: 350, width: 160, height: 50, variant: 'ground' },
-      { x: 640, y: 220, width: 160, height: 20, variant: 'floating' },
-    ],
-    movingPlatforms: [],
-    spikes: [
-      { x: 140, y: 328, width: 500, height: 22 },
+      { x: 110, y: 335, width: 820, height: 15 }
     ],
     movingSpikes: [],
   },
@@ -265,24 +232,45 @@ const levels = [
     name: 'Spike Ballet',
   hint: 'Five spike clusters guard the bridge—two dart sideways when you leap, so plan each jump!',
     startPosition: { x: 690, y: 280 },
-    door: { x: 60, y: 260, width: 30, height: 50 },
+    door: { x: 20, y: 300, width: 30, height: 50 },
     jumpPads: [],
     platforms: [
       { x: 0, y: 350, width: 800, height: 50, variant: 'ground' },
-      { x: 40, y: 270, width: 120, height: 18, variant: 'floating' },
-      { x: 640, y: 270, width: 120, height: 18, variant: 'floating' },
+    
     ],
     movingPlatforms: [],
     spikes: [
-      { x: 100, y: 328, width: 60, height: 22 },
-      { x: 360, y: 328, width: 60, height: 22 },
-      { x: 620, y: 328, width: 60, height: 22 },
+      { x: 100, y: 335, width: 60, height: 22 },
+      { x: 360, y: 335, width: 60, height: 22 },
+      { x: 620, y: 335, width: 60, height: 22 },
     ],
     movingSpikes: [
-      { id: 'popper-1', axis: 'horizontal', startX: 190, startY: 328, width: 60, height: 22, minX: 190, maxX: 280, speed: 2.4, triggerOnJump: true, activationRange: 200, initialDirection: 1 },
-      { id: 'popper-2', axis: 'horizontal', startX: 430, startY: 328, width: 60, height: 22, minX: 430, maxX: 520, speed: 2.4, triggerOnJump: true, activationRange: 200, initialDirection: 1 },
+      { id: 'popper-1', axis: 'horizontal', startX: 190, startY: 335, width: 60, height: 22, minX: 190, maxX: 280, speed: 2.4, triggerOnJump: true, activationRange: 200, initialDirection: 1 },
+      { id: 'popper-2', axis: 'horizontal', startX: 430, startY: 335, width: 60, height: 22, minX: 430, maxX: 520, speed: 2.4, triggerOnJump: true, activationRange: 200, initialDirection: 1 },
     ],
   },
+  {
+    name: 'Blazing Return',
+    hint: 'Ride each moving launch pad as it glides forward, then spring off before it snaps back.',
+    startPosition: { x: 40, y: 260 },
+    door: { x: 700, y: 170, width: 30, height: 50 },
+    jumpPads: [
+      { id: 'return-pad-1', startX: 200, minX: 160, maxX: 240, width: 40, height: 18, y: 300, speed: 1.3, strength: -10 },
+      { id: 'return-pad-2', startX: 300, minX: 260, maxX: 340, width: 40, height: 18, y: 280, speed: 1.3, strength: -10 },
+      { id: 'return-pad-3', startX: 400, minX: 360, maxX: 440, width: 40, height: 18, y: 260, speed: 1.3, strength: -10 },
+      { id: 'return-pad-4', startX: 500, minX: 460, maxX: 540, width: 40, height: 18, y: 240, speed: 1.3, strength: -10 },
+    ],
+    platforms: [
+      { x: 0, y: 350, width: 150, height: 50, variant: 'ground' },
+      { x: 40, y: 290, width: 90, height: 18, variant: 'floating' },
+      { x: 640, y: 220, width: 160, height: 20, variant: 'floating' },
+    ],
+    movingPlatforms: [],
+    spikes: [
+      { x: 140, y: 335, width: 800, height: 22 },
+    ],
+    movingSpikes: [],
+  }
 
 ];
 
@@ -687,11 +675,14 @@ export default function DevilPlatformer() {
       }
 
       let newVelX = 0;
+      let currentDirection = 'none';
       if (keysRef.current['ArrowLeft'] || keysRef.current['a'] || keysRef.current['A']) {
         newVelX = -MOVE_SPEED;
+        currentDirection = 'left';
       }
       if (keysRef.current['ArrowRight'] || keysRef.current['d'] || keysRef.current['D']) {
         newVelX = MOVE_SPEED;
+        currentDirection = 'right';
       }
       velocityRef.current.x = newVelX;
 
@@ -932,9 +923,9 @@ export default function DevilPlatformer() {
             }}
           >
             <div className="flex h-full">
-              {Array.from({ length: Math.floor(spike.width / 20) }).map((_, i) => (
-                <svg key={i} width="20" height="22" viewBox="0 0 20 22" className="flex-shrink-0">
-                  <polygon points="10,0 20,22 0,22" fill="#991b1b" stroke="#7f1d1d" strokeWidth="1" />
+              {Array.from({ length: Math.floor(spike.width / 12) }).map((_, i) => (
+                <svg key={i} width="10" height="15" viewBox="0 0 12 14" className="flex-shrink-0">
+                  <polygon points="6,0 12,14 0,14" fill="#991b1b" stroke="#7f1d1d" strokeWidth="1" />
                 </svg>
               ))}
             </div>
@@ -953,9 +944,9 @@ export default function DevilPlatformer() {
             }}
           >
             <div className="flex h-full">
-              {Array.from({ length: Math.floor(spike.width / 20) }).map((_, i) => (
-                <svg key={i} width="20" height="22" viewBox="0 0 20 22" className="flex-shrink-0">
-                  <polygon points="10,0 20,22 0,22" fill="#991b1b" stroke="#7f1d1d" strokeWidth="1" />
+              {Array.from({ length: Math.floor(spike.width / 12) }).map((_, i) => (
+                <svg key={i} width="10" height="15" viewBox="0 0 12 14" className="flex-shrink-0">
+                  <polygon points="6,0 12,14 0,14" fill="#991b1b" stroke="#7f1d1d" strokeWidth="1" />
                 </svg>
               ))}
             </div>
@@ -1015,18 +1006,23 @@ export default function DevilPlatformer() {
             }}
           >
             <div className="relative w-full h-full">
-              <div className="absolute -top-1 left-1 w-2 h-3 bg-red-900 transform -rotate-12 rounded-t-full"></div>
-              <div className="absolute -top-1 right-1 w-2 h-3 bg-red-900 transform rotate-12 rounded-t-full"></div>
-              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-8 h-8 bg-red-600 rounded-full border-2 border-red-800">
-                <div className="absolute top-2 left-1 w-1.5 h-2 bg-yellow-400 rounded-full"></div>
-                <div className="absolute top-2 right-1 w-1.5 h-2 bg-yellow-400 rounded-full"></div>
-                <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-4 h-1 border-b-2 border-black rounded-b-full"></div>
-              </div>
-              <div className="absolute top-6 left-1/2 transform -translate-x-1/2 w-6 h-10 bg-red-700 rounded-lg border-2 border-red-900"></div>
-              <div className="absolute top-8 -right-1 w-1.5 h-8 bg-red-700 rounded-full transform rotate-45 origin-top"></div>
-              <div className="absolute bottom-0 left-2 w-2 h-6 bg-red-800 rounded-b-lg"></div>
-              <div className="absolute bottom-0 right-2 w-2 h-6 bg-red-800 rounded-b-lg"></div>
-            </div>
+  {/* Horns */}
+  <div className="absolute -top-1 left-1 w-2 h-3 bg-red-900 transform -rotate-12 rounded-t-full"></div>
+  <div className="absolute -top-1 right-1 w-2 h-3 bg-red-900 transform rotate-12 rounded-t-full"></div>
+
+  {/* Head */}
+  <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-8 h-8 bg-red-600 rounded-full border-2 border-red-800">
+    {/* Eyes */}
+    <div className="absolute top-2 left-1 w-1.5 h-2 bg-yellow-400 rounded-full"></div>
+    <div className="absolute top-2 right-1 w-1.5 h-2 bg-yellow-400 rounded-full"></div>
+    {/* Mouth */}
+    <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-4 h-1 border-b-2 border-black rounded-b-full"></div>
+  </div>
+
+  {/* Body */}
+  <div className="absolute top-8 left-1/2 transform -translate-x-1/2 w-6 h-8 bg-red-700 rounded-lg border-2 border-red-900"></div>
+</div>
+
           </div>
         </div>
 
