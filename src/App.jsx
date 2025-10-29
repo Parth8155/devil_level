@@ -40,6 +40,44 @@ const createJumpPadState = (definitions = []) =>
     };
   });
 
+const createMovingSpikeState = (definitions = []) =>
+  definitions.map((spike) => {
+    const axis = spike.axis ?? 'vertical';
+    const startX = spike.startX ?? spike.x ?? 0;
+    const startY = spike.startY ?? spike.y ?? 0;
+    const travelDistance = spike.travelDistance ?? 0;
+    const travelDistanceDown = spike.travelDistanceDown ?? travelDistance;
+
+    const minX = axis === 'horizontal'
+      ? spike.minX ?? startX - travelDistance
+      : startX;
+    const maxX = axis === 'horizontal'
+      ? spike.maxX ?? startX + travelDistance
+      : startX;
+    const minY = axis === 'vertical'
+      ? spike.minY ?? startY - travelDistance
+      : startY;
+    const maxY = axis === 'vertical'
+      ? spike.maxY ?? startY + travelDistanceDown
+      : startY;
+
+    return {
+      ...spike,
+      axis,
+      startX,
+      startY,
+      x: startX,
+      y: startY,
+      minX,
+      maxX,
+      minY,
+      maxY,
+      direction: spike.initialDirection ?? -1,
+      activated: spike.triggerOnStart ?? false,
+      cooldown: 0,
+    };
+  });
+
 const prepareStaticPlatforms = (level) =>
   (level.platforms ?? []).map((platform) => ({
     ...platform,
@@ -103,6 +141,7 @@ const levels = [
       { x: 170, y: 328, width: 280, height: 22 },
       { x: 450, y: 328, width: 180, height: 22 },
     ],
+    movingSpikes: [],
   },
   {
     name: 'Molten Ferry',
@@ -132,6 +171,7 @@ const levels = [
     spikes: [
       { x: 170, y: 328, width: 420, height: 22 },
     ],
+    movingSpikes: [],
   },
   {
     name: 'Obsidian Peaks',
@@ -166,6 +206,7 @@ const levels = [
       { x: 280, y: 328, width: 140, height: 22 },
       { x: 460, y: 328, width: 160, height: 22 },
     ],
+    movingSpikes: [],
   },
   {
     name: "Hell's Gauntlet",
@@ -195,6 +236,7 @@ const levels = [
       { x: 512, y: 328, width: 120, height: 22 },
       { x: 648, y: 328, width: 90, height: 22 },
     ],
+    movingSpikes: [],
   },
   {
     name: 'Blazing Return',
@@ -217,6 +259,29 @@ const levels = [
     spikes: [
       { x: 140, y: 328, width: 500, height: 22 },
     ],
+    movingSpikes: [],
+  },
+  {
+    name: 'Spike Ballet',
+  hint: 'Five spike clusters guard the bridge—two dart sideways when you leap, so plan each jump!',
+    startPosition: { x: 690, y: 280 },
+    door: { x: 60, y: 260, width: 30, height: 50 },
+    jumpPads: [],
+    platforms: [
+      { x: 0, y: 350, width: 800, height: 50, variant: 'ground' },
+      { x: 40, y: 270, width: 120, height: 18, variant: 'floating' },
+      { x: 640, y: 270, width: 120, height: 18, variant: 'floating' },
+    ],
+    movingPlatforms: [],
+    spikes: [
+      { x: 100, y: 328, width: 60, height: 22 },
+      { x: 360, y: 328, width: 60, height: 22 },
+      { x: 620, y: 328, width: 60, height: 22 },
+    ],
+    movingSpikes: [
+      { id: 'popper-1', axis: 'horizontal', startX: 190, startY: 328, width: 60, height: 22, minX: 190, maxX: 280, speed: 2.4, triggerOnJump: true, activationRange: 200, initialDirection: 1 },
+      { id: 'popper-2', axis: 'horizontal', startX: 430, startY: 328, width: 60, height: 22, minX: 430, maxX: 520, speed: 2.4, triggerOnJump: true, activationRange: 200, initialDirection: 1 },
+    ],
   },
 
 ];
@@ -227,17 +292,34 @@ export default function DevilPlatformer() {
   const [position, setPosition] = useState({ ...levels[0].startPosition });
   const [gameState, setGameState] = useState('playing'); // playing, won, dead
   const [showMessage, setShowMessage] = useState(false);
+  const [isShaking, setIsShaking] = useState(false);
   
   const velocityRef = useRef({ x: 0, y: 0 });
   const keysRef = useRef({});
   const isJumpingRef = useRef(false);
+  const impactSoundRef = useRef(null);
+  const doorSoundRef = useRef(null);
   const jumpPadsRef = useRef(createJumpPadState(levels[0].jumpPads ?? []));
+  const movingSpikesRef = useRef(createMovingSpikeState(levels[0].movingSpikes ?? []));
+  const jumpTriggeredRef = useRef(false);
+  const jumpTriggerXRef = useRef(0);
   const deathMessageTimeoutRef = useRef();
   const staticPlatformsRef = useRef(prepareStaticPlatforms(levels[0]));
   const movingPlatformsRef = useRef(createMovingPlatformState(levels[0].movingPlatforms ?? []));
   const positionRef = useRef({ ...levels[0].startPosition });
 
   const level = levels[levelIndex];
+
+  // Initialize impact sound
+  useEffect(() => {
+    impactSoundRef.current = new Audio('/impact-sound.mp3');
+    impactSoundRef.current.volume = 0.7;
+    impactSoundRef.current.preload = 'auto';
+    
+    doorSoundRef.current = new Audio('/closed-door.mp3');
+    doorSoundRef.current.volume = 0.8;
+    doorSoundRef.current.preload = 'auto';
+  }, []);
 
   // Handle keyboard input
   useEffect(() => {
@@ -247,6 +329,8 @@ export default function DevilPlatformer() {
       if ((e.key === ' ' || e.key === 'ArrowUp') && !isJumpingRef.current) {
         velocityRef.current.y = JUMP_STRENGTH;
         isJumpingRef.current = true;
+        jumpTriggeredRef.current = true;
+        jumpTriggerXRef.current = positionRef.current.x;
       }
     };
 
@@ -274,14 +358,17 @@ export default function DevilPlatformer() {
   useEffect(() => {
     movingPlatformsRef.current = createMovingPlatformState(level.movingPlatforms ?? []);
     staticPlatformsRef.current = prepareStaticPlatforms(level);
+    movingSpikesRef.current = createMovingSpikeState(level.movingSpikes ?? []);
     setPosition({ ...level.startPosition });
     positionRef.current = { ...level.startPosition };
     velocityRef.current = { x: 0, y: 0 };
     isJumpingRef.current = false;
     keysRef.current = {};
-  jumpPadsRef.current = createJumpPadState(level.jumpPads ?? []);
+    jumpPadsRef.current = createJumpPadState(level.jumpPads ?? []);
+    jumpTriggeredRef.current = false;
     setGameState('playing');
     setShowMessage(false);
+    setIsShaking(false);
     if (deathMessageTimeoutRef.current) {
       clearTimeout(deathMessageTimeoutRef.current);
       deathMessageTimeoutRef.current = undefined;
@@ -334,6 +421,16 @@ export default function DevilPlatformer() {
 
   const checkSpikeCollision = (x, y) => {
     for (let spike of level.spikes ?? []) {
+      if (
+        x + DEVIL_WIDTH - 5 > spike.x &&
+        x + 5 < spike.x + spike.width &&
+        y + DEVIL_HEIGHT - 3 > spike.y &&
+        y + DEVIL_HEIGHT < spike.y + spike.height + 5
+      ) {
+        return true;
+      }
+    }
+    for (let spike of movingSpikesRef.current ?? []) {
       if (
         x + DEVIL_WIDTH - 5 > spike.x &&
         x + 5 < spike.x + spike.width &&
@@ -487,8 +584,29 @@ export default function DevilPlatformer() {
     const gameLoop = () => {
       processAutoTriggerBreakables(positionRef.current.x);
 
+      const player = positionRef.current;
+      const jumpTriggered = jumpTriggeredRef.current;
+      if (jumpTriggered) {
+        if (movingSpikesRef.current.length) {
+          const triggerCenter = (jumpTriggerXRef.current ?? player.x) + DEVIL_WIDTH / 2;
+          movingSpikesRef.current.forEach((spike) => {
+            if (spike.activated || !spike.triggerOnJump) {
+              return;
+            }
+            const spikeCenter = spike.x + spike.width / 2;
+            if (
+              spike.activationRange === undefined ||
+              Math.abs(triggerCenter - spikeCenter) <= spike.activationRange
+            ) {
+              spike.activated = true;
+              spike.direction = spike.initialDirection ?? -1;
+            }
+          });
+        }
+        jumpTriggeredRef.current = false;
+      }
+
       if (movingPlatformsRef.current.length) {
-        const player = positionRef.current;
         movingPlatformsRef.current.forEach((platform) => {
           platform.deltaX = 0;
 
@@ -516,6 +634,37 @@ export default function DevilPlatformer() {
               platform.progress = nextProgress;
             } else {
               platform.deltaX = 0;
+            }
+          }
+        });
+      }
+
+      if (movingSpikesRef.current.length) {
+        movingSpikesRef.current.forEach((spike) => {
+          if (!spike.activated) {
+            return;
+          }
+          const speed = spike.speed ?? 0;
+          if (!speed) {
+            return;
+          }
+          if (spike.axis === 'horizontal') {
+            spike.x += speed * spike.direction;
+            if (spike.direction < 0 && spike.x <= spike.minX) {
+              spike.x = spike.minX;
+              spike.direction = 1;
+            } else if (spike.direction > 0 && spike.x >= spike.maxX) {
+              spike.x = spike.maxX;
+              spike.direction = -1;
+            }
+          } else {
+            spike.y += speed * spike.direction;
+            if (spike.direction < 0 && spike.y <= spike.minY) {
+              spike.y = spike.minY;
+              spike.direction = 1;
+            } else if (spike.direction > 0 && spike.y >= spike.maxY) {
+              spike.y = spike.maxY;
+              spike.direction = -1;
             }
           }
         });
@@ -599,19 +748,31 @@ export default function DevilPlatformer() {
         }
 
         if (checkSpikeCollision(newX, newY)) {
+          // Play impact sound
+          if (impactSoundRef.current) {
+            impactSoundRef.current.currentTime = 0;
+            impactSoundRef.current.play().catch(e => console.log('Audio play failed:', e));
+          }
           setGameState('dead');
           setShowMessage(true);
+          setIsShaking(true);
           if (deathMessageTimeoutRef.current) {
             clearTimeout(deathMessageTimeoutRef.current);
           }
           deathMessageTimeoutRef.current = setTimeout(() => {
             setShowMessage(false);
+            setIsShaking(false);
             deathMessageTimeoutRef.current = undefined;
           }, 2000);
           return prev;
         }
 
         if (checkDoorCollision(newX, newY)) {
+          // Play door sound
+          if (doorSoundRef.current) {
+            doorSoundRef.current.currentTime = 0;
+            doorSoundRef.current.play().catch(e => console.log('Door audio play failed:', e));
+          }
           setGameState('won');
           setShowMessage(true);
           setMaxUnlockedLevel((current) => {
@@ -624,11 +785,13 @@ export default function DevilPlatformer() {
         if (newY > CANVAS_HEIGHT) {
           setGameState('dead');
           setShowMessage(true);
+          setIsShaking(true);
           if (deathMessageTimeoutRef.current) {
             clearTimeout(deathMessageTimeoutRef.current);
           }
           deathMessageTimeoutRef.current = setTimeout(() => {
             setShowMessage(false);
+            setIsShaking(false);
             deathMessageTimeoutRef.current = undefined;
           }, 2000);
           return prev;
@@ -647,14 +810,17 @@ export default function DevilPlatformer() {
   const resetGame = () => {
     movingPlatformsRef.current = createMovingPlatformState(level.movingPlatforms ?? []);
     staticPlatformsRef.current = prepareStaticPlatforms(level);
+    movingSpikesRef.current = createMovingSpikeState(level.movingSpikes ?? []);
     setPosition({ ...level.startPosition });
     positionRef.current = { ...level.startPosition };
     velocityRef.current = { x: 0, y: 0 };
     isJumpingRef.current = false;
     keysRef.current = {};
-  jumpPadsRef.current = createJumpPadState(level.jumpPads ?? []);
+    jumpPadsRef.current = createJumpPadState(level.jumpPads ?? []);
+    jumpTriggeredRef.current = false;
     setGameState('playing');
     setShowMessage(false);
+    setIsShaking(false);
     if (deathMessageTimeoutRef.current) {
       clearTimeout(deathMessageTimeoutRef.current);
       deathMessageTimeoutRef.current = undefined;
@@ -678,19 +844,29 @@ export default function DevilPlatformer() {
     : 'Reach the blue door with careful jumps - no jump pads to help this time!');
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-orange-800 to-red-900 p-8">
-      <div className="absolute top-4 left-4 flex gap-2">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-black via-red-950 to-red-900 p-8 relative overflow-hidden">
+      {/* Hellish background pattern */}
+      <div className="absolute inset-0 opacity-20">
+        <div className="absolute inset-0 bg-gradient-radial from-red-600/30 via-transparent to-black/50"></div>
+        <div className="absolute top-0 left-0 w-full h-full bg-repeat opacity-10" 
+             style={{backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ff4444' fill-opacity='0.3'%3E%3Cpath d='M20 20l10-10v20l-10-10zm-10 0L0 10v20l10-10z'/%3E%3C/g%3E%3C/svg%3E")`}}>
+        </div>
+      </div>
+      
+      <div className="absolute top-4 left-4 flex gap-2 z-30">
         <button
           onClick={goToPreviousLevel}
           disabled={previousDisabled}
-          className={`w-10 h-10 border-2 border-yellow-600 flex items-center justify-center text-yellow-200 text-xl font-bold ${previousDisabled ? 'bg-orange-800 opacity-40 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-500'}`}
+          className={`w-12 h-12 border-2 border-red-600 flex items-center justify-center text-red-200 text-xl font-bold hell-glow transition-all duration-200 ${previousDisabled ? 'bg-black/60 opacity-40 cursor-not-allowed' : 'bg-red-900/80 hover:bg-red-800/90 hover:scale-105'}`}
+          style={{fontFamily: 'Metal Mania, cursive'}}
           aria-label="Previous level"
         >
           ◀
         </button>
         <button
           onClick={resetGame}
-          className="w-10 h-10 bg-orange-600 border-2 border-yellow-600 flex items-center justify-center text-yellow-200 text-xl font-bold hover:bg-orange-500"
+          className="w-12 h-12 bg-red-900/80 border-2 border-red-600 flex items-center justify-center text-red-200 text-xl font-bold hell-glow hover:bg-red-800/90 hover:scale-105 transition-all duration-200"
+          style={{fontFamily: 'Metal Mania, cursive'}}
           aria-label="Restart level"
         >
           ↻
@@ -698,20 +874,26 @@ export default function DevilPlatformer() {
         <button
           onClick={goToNextLevel}
           disabled={nextDisabled}
-          className={`w-10 h-10 border-2 border-yellow-600 flex items-center justify-center text-yellow-200 text-xl font-bold ${nextDisabled ? 'bg-orange-800 opacity-40 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-500'}`}
+          className={`w-12 h-12 border-2 border-red-600 flex items-center justify-center text-red-200 text-xl font-bold hell-glow transition-all duration-200 ${nextDisabled ? 'bg-black/60 opacity-40 cursor-not-allowed' : 'bg-red-900/80 hover:bg-red-800/90 hover:scale-105'}`}
+          style={{fontFamily: 'Metal Mania, cursive'}}
           aria-label="Next level"
         >
           ▶
         </button>
       </div>
 
-      <div className="absolute top-4 right-4 bg-black/40 text-yellow-200 text-sm font-semibold px-3 py-1 rounded border border-yellow-500">
-        Level {levelIndex + 1}/{levels.length} | {level.name}
+      <div className="absolute top-4 right-4 bg-black/80 text-red-200 text-sm font-bold px-4 py-2 rounded-lg border-2 border-red-600 hell-glow z-30" style={{fontFamily: 'Creepster, cursive'}}>
+        <div className="fire-glow">LEVEL {levelIndex + 1}/{levels.length}</div>
+        <div className="text-xs text-red-300 mt-1">{level.name}</div>
       </div>
 
       <div
-        className="relative bg-gradient-to-b from-yellow-300 to-yellow-400 rounded-lg overflow-hidden shadow-2xl"
-        style={{ width: `${CANVAS_WIDTH}px`, height: `${CANVAS_HEIGHT}px` }}
+        className={`relative bg-gradient-to-b from-orange-600 via-red-500 to-red-800 rounded-lg overflow-hidden shadow-2xl border-4 border-red-900 z-20 ${isShaking ? 'screen-shake' : ''}`}
+        style={{ 
+          width: `${CANVAS_WIDTH}px`, 
+          height: `${CANVAS_HEIGHT}px`,
+          boxShadow: '0 0 50px rgba(139, 0, 0, 0.8), inset 0 0 20px rgba(0, 0, 0, 0.5)'
+        }}
       >
   {(staticPlatformsRef.current ?? []).map((platform, idx) => (
           <div
@@ -741,6 +923,27 @@ export default function DevilPlatformer() {
         {(level.spikes ?? []).map((spike, idx) => (
           <div
             key={`spike-${idx}`}
+            className="absolute z-20"
+            style={{
+              left: `${spike.x}px`,
+              top: `${spike.y}px`,
+              width: `${spike.width}px`,
+              height: `${spike.height}px`,
+            }}
+          >
+            <div className="flex h-full">
+              {Array.from({ length: Math.floor(spike.width / 20) }).map((_, i) => (
+                <svg key={i} width="20" height="22" viewBox="0 0 20 22" className="flex-shrink-0">
+                  <polygon points="10,0 20,22 0,22" fill="#991b1b" stroke="#7f1d1d" strokeWidth="1" />
+                </svg>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {(movingSpikesRef.current ?? []).map((spike, idx) => (
+          <div
+            key={`moving-spike-${spike.id ?? idx}`}
             className="absolute z-20"
             style={{
               left: `${spike.x}px`,
@@ -828,41 +1031,50 @@ export default function DevilPlatformer() {
         </div>
 
         {showMessage && gameState === 'dead' && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-            <div className="bg-red-600 text-white px-8 py-4 rounded-lg text-2xl font-bold border-4 border-red-800">
-              YOU DIED! 💀
-              <div className="text-sm mt-2">Press ↻ to try again</div>
+          <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+            <div className="bg-gradient-to-br from-red-900 to-black text-red-200 px-12 py-8 rounded-lg text-4xl font-bold border-4 border-red-600 hell-glow transform rotate-1">
+              <div className="fire-glow text-center" style={{fontFamily: 'Nosifer, cursive'}}>
+                💀 SOUL CLAIMED! 💀
+              </div>
+              <div className="text-lg mt-4 text-center text-red-300" style={{fontFamily: 'Creepster, cursive'}}>
+                The abyss awaits... Press ↻ to rise again
+              </div>
             </div>
           </div>
         )}
 
         {gameState === 'won' && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-            <div className="bg-green-600 text-white px-8 py-4 rounded-lg text-2xl font-bold border-4 border-green-800 text-center">
-              {isLastLevel ? 'ALL LEVELS CLEARED! 🎉' : `LEVEL ${levelIndex + 1} COMPLETE!`}
-              <div className="text-sm mt-2">
-                {isLastLevel ? 'Press ◀ to revisit earlier levels or ↻ to replay this finale.' : 'Press ▶ for the next challenge or ↻ to replay.'}
+          <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+            <div className="bg-gradient-to-br from-orange-600 to-red-900 text-red-200 px-12 py-8 rounded-lg text-3xl font-bold border-4 border-orange-500 hell-glow text-center transform -rotate-1">
+              <div className="fire-glow" style={{fontFamily: 'Creepster, cursive'}}>
+                {isLastLevel ? '🔥 HELL CONQUERED! 🔥' : `🎯 STAGE ${levelIndex + 1} CLEARED! 🎯`}
+              </div>
+              <div className="text-base mt-4 text-orange-200" style={{fontFamily: 'Metal Mania, cursive'}}>
+                {isLastLevel ? 'The devil reigns supreme! Press ◀ to revisit or ↻ to replay.' : 'The inferno beckons... Press ▶ for next torment or ↻ to replay.'}
               </div>
               {!isLastLevel && (
                 <button
                   onClick={goToNextLevel}
                   disabled={nextDisabled}
-                  className={`mt-3 px-4 py-1 rounded font-semibold text-red-900 ${nextDisabled ? 'bg-yellow-700/60 cursor-not-allowed opacity-60' : 'bg-yellow-300 hover:bg-yellow-200'}`}
+                  className={`mt-4 px-6 py-2 rounded-lg font-bold border-2 transition-all duration-200 ${nextDisabled ? 'bg-black/60 border-red-800 text-red-600 cursor-not-allowed opacity-60' : 'bg-red-800 border-orange-500 text-orange-200 hover:bg-red-700 hover:scale-105 hell-glow'}`}
+                  style={{fontFamily: 'Metal Mania, cursive'}}
                 >
-                  Next ▶
+                  DESCEND DEEPER ▶
                 </button>
               )}
             </div>
           </div>
         )}
 
-        <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-          ← → Move | SPACE Jump
+        <div className="absolute bottom-2 left-2 bg-black/80 text-red-200 text-xs px-3 py-2 rounded-lg border border-red-600 hell-glow" 
+             style={{fontFamily: 'Metal Mania, cursive'}}>
+          ← → MOVE | SPACE LEAP
         </div>
       </div>
 
-      <div className="mt-4 text-yellow-200 text-sm max-w-md text-center">
-        {instructionsMessage}
+      <div className="mt-6 text-red-200 text-base max-w-lg text-center bg-black/60 px-6 py-3 rounded-lg border border-red-600 hell-glow z-20" 
+           style={{fontFamily: 'Creepster, cursive'}}>
+        <div className="fire-glow">{instructionsMessage}</div>
       </div>
     </div>
   );

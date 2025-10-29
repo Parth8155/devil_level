@@ -1,1 +1,43 @@
 @import "tailwindcss";
+
+/* Custom Devilish Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Creepster&family=Nosifer&family=Metal+Mania&display=swap');
+
+/* Screen shake animation for death */
+@keyframes screenShake {
+  0% { transform: translate(0px, 0px); }
+  10% { transform: translate(-2px, -2px); }
+  20% { transform: translate(2px, -2px); }
+  30% { transform: translate(-2px, 2px); }
+  40% { transform: translate(2px, 2px); }
+  50% { transform: translate(-1px, -2px); }
+  60% { transform: translate(1px, 2px); }
+  70% { transform: translate(-2px, 1px); }
+  80% { transform: translate(2px, -1px); }
+  90% { transform: translate(-1px, 1px); }
+  100% { transform: translate(0px, 0px); }
+}
+
+.screen-shake {
+  animation: screenShake 0.5s ease-in-out;
+}
+
+/* Glowing fire effect */
+@keyframes fireGlow {
+  0%, 100% { text-shadow: 0 0 5px #ff4444, 0 0 10px #ff4444, 0 0 20px #ff4444; }
+  50% { text-shadow: 0 0 10px #ff6666, 0 0 20px #ff6666, 0 0 30px #ff6666; }
+}
+
+.fire-glow {
+  animation: fireGlow 1s ease-in-out infinite;
+}
+
+/* Pulsing hellish glow for UI elements */
+@keyframes hellGlow {
+  0%, 100% { box-shadow: 0 0 10px rgba(139, 0, 0, 0.8), inset 0 0 10px rgba(139, 0, 0, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(255, 69, 0, 0.9), inset 0 0 20px rgba(255, 69, 0, 0.4); }
+}
+
+.hell-glow {
+  animation: hellGlow 2s ease-in-out infinite;
+}
